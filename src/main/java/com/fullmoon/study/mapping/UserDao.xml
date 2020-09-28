@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.fullmoon.study.dao.UserDao">
+	<!-- 开启二级缓存配置 -->
+	<cache eviction="LRU" flushInterval="10000" readOnly="false" size="100"/>
+	<resultMap id="BaseResultMap" type="com.fullmoon.study.model.User" >
+		<!-- Mybatis会对<resultMap />中的<id />中的字段进行判断，如果该字段相同则会将相同的数据进行合并，如果没有<id />标签则当所有字段相同时进行合并 -->
+		<!-- 注意：<id /> 标签中的值不能为空，如果查询出来的为空，则会将所有为空的数据进行合并，所以这里一般设置主键或者唯一键 -->
+		<!-- 每个<resultMap />中最好设置一个<id />，因为Mybatis中会对结果进行比较，没有<id />标签的话会将所有数据进行比较，假设数据有M字段、N个数据，则进行M*N次比较，降低效率 -->
+		<!-- 有时数据库中某张用户表的主键并不是工号，如果由于某种原因导致出现两个工号相同的数据，可以利用该标签进行合并处理，避免异常 -->
+		<id column="id" jdbcType="INTEGER" property="id" />
+		<result column="name" jdbcType="VARCHAR" property="name" />
+		<result column="age" jdbcType="INTEGER" property="age" />
+		<result column="password" jdbcType="VARCHAR" property="password" />
+	</resultMap>
+
+	<!-- 这里的id必须和方法名保持一致，因为Mybatis将接口与XML文件进行绑定时，是通过接口全限定名称+方法名去寻找对应的MappedStatement -->
+	<!-- MappedStatement存储的key值为namespace+id组成，寻找策略如此，所以id和方法名一致，进而接口中不能出现重载方法 -->
+	<select id="queryUserById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+		SELECT
+			id,`name`,age,password
+		FROM
+			`user`
+		WHERE
+			id = #{id}
+		<include refid="testA"/>
+	</select>
+
+	<!-- 查询数据前清空一级缓存 -->
+	<select id="queryUserByName" flushCache="true" parameterType="java.lang.String" resultMap="BaseResultMap">
+		SELECT
+			id,`name`,age,password
+		FROM
+			`user`
+		<where>
+		<!-- 动态SQL中使用的参数最好要有@Param指定对应名称，否则可能会报错，具体原因有待深入研究 -->
+		<!-- Mybatis默认采用ONGL解析参数，所以会自动采用对象树的形式取string.param值，可以使用@Param("param")，即取param的值解决错误，或者取动态SQL中默认参数名_parameter -->
+			<if test="param != null and param.length() != 0 ">
+				`name` LIKE #{param}
+			</if>
+		</where>
+	</select>
+
+	<update id="updateUserById" parameterType="com.fullmoon.study.model.User">
+		UPDATE user
+		SET name = #{name}
+		WHERE id = #{id}
+	</update>
+
+	<sql id="testA" >
+		<![CDATA[ LIMIT 0,1 ]]>
+	</sql>
+
+	<!-- 调用存储过程，statementType需设置成CALLABLE，Mybatis不支持存储过程的二级缓存，所以得设置useCache为false -->
+	<!-- 使用的参数必须设置参数的模式(mode)，IN表示入参，OUT表示出参，INOUT表示输入输出参数 -->
+	<select id="" statementType="CALLABLE" useCache="false">
+		{call name(
+			#{id, mode=IN},
+			#{name, mode=OUT, jdbcType=VARCHAR},
+			#{age, mode=OUT, jdbcType=INTEGER}
+		)}
+
+	</select>
+
+</mapper>
